@@ -17,7 +17,7 @@ const InvoiceSchema = new mongoose.Schema({
   
   specifications: [{
     label: String,
-    checked: Boolean
+    checked: Boolean,
   }],
   
   selectedImages: [String],
