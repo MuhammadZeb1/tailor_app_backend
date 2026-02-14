@@ -1,9 +1,11 @@
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
 
+dotenv.config();
 const connectDB = async () => {
   try {
     // Modern Mongoose does not need the options object
-    const conn = await mongoose.connect("mongodb://localhost:27017/tailorDB");
+    const conn = await mongoose.connect(process.env.MONGODB_URI);
     
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
