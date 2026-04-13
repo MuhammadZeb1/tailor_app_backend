@@ -1,23 +1,17 @@
 import Invoice from '../model/Invoice.js';
 
 // CREATE
-// CREATE
 export const createInvoice = async (req, res) => {
   try {
-    // Just pass the body. The Model's "pre-save" hook 
-    // will automatically add the invoiceNumber.
-    const newInvoice = new Invoice(req.body);
+    // It's good practice to log the incoming body to verify designLayers is present
+    console.log("Incoming Invoice Data:", JSON.stringify(req.body, null, 2));
 
-    console.log("body",req.body)
-    
-    console.log("Saving new invoice for:", req.body.customerName);
-    
+    const newInvoice = new Invoice(req.body);
     const saved = await newInvoice.save();
     
-    // Send the saved invoice (which now includes the auto-number) back to the frontend
     res.status(201).json(saved);
   } catch (err) {
-    // If something goes wrong (like a missing name), show the error
+    console.error("Create Error:", err.message);
     res.status(400).json({ error: err.message });
   }
 };
@@ -25,7 +19,8 @@ export const createInvoice = async (req, res) => {
 // READ ALL
 export const getInvoices = async (req, res) => {
   try {
-    const invoices = await Invoice.find().sort({ createdAt: -1 });
+    // .lean() makes the query faster if you're only reading data
+    const invoices = await Invoice.find().sort({ createdAt: -1 }).lean();
     res.json(invoices);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -35,7 +30,15 @@ export const getInvoices = async (req, res) => {
 // UPDATE
 export const updateInvoice = async (req, res) => {
   try {
-    const updated = await Invoice.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    // runValidators ensures the update follows your Schema rules
+    const updated = await Invoice.findByIdAndUpdate(
+      req.params.id, 
+      req.body, 
+      { new: true, runValidators: true } 
+    );
+    
+    if (!updated) return res.status(404).json({ error: "Invoice not found" });
+    
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -45,8 +48,10 @@ export const updateInvoice = async (req, res) => {
 // DELETE
 export const deleteInvoice = async (req, res) => {
   try {
-    await Invoice.findByIdAndDelete(req.params.id);
-    res.json({ message: "Invoice Deleted" });
+    const deleted = await Invoice.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Invoice not found" });
+    
+    res.json({ message: "Invoice Deleted Successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1,11 +1,29 @@
 import mongoose from 'mongoose';
 
+// 1. Define what a "Marker" (the 3.3, 2.2 text on the image) looks like
+const MarkerSchema = new mongoose.Schema({
+  x: Number,
+  y: Number,
+  text: String
+});
+
+// 2. Define what a "Design Layer" (the image + its markers) looks like
+const DesignLayerSchema = new mongoose.Schema({
+  name: String,
+  url: String,
+  x: Number,
+  y: Number,
+  markers: [MarkerSchema] 
+});
+
 const InvoiceSchema = new mongoose.Schema({
-  // We remove 'required' because the computer will generate it automatically
   invoiceNumber: { type: Number, unique: true }, 
   refNumber: { type: Number },
   customerName: { type: String, required: true },
   contactNo: { type: String, required: true }, 
+  customerAddress: { type: String },
+  additionalNotes: { type: String },
+  tadad: { type: Number, default: 1 },
 
   bookingDate: { type: Date, default: Date.now },
   deliveryDate: { type: Date },
@@ -20,7 +38,8 @@ const InvoiceSchema = new mongoose.Schema({
     checked: Boolean,
   }],
   
-  selectedImages: [String],
+  // This now matches the "designLayers" array sent from your frontend
+  designLayers: [DesignLayerSchema], 
 
   totalAmount: { type: Number, default: 0 },
   advanceAmount: { type: Number, default: 0 },
@@ -29,22 +48,14 @@ const InvoiceSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-// --- FIXED AUTO-COUNTER LOGIC ---
+// --- AUTO-COUNTER LOGIC ---
 InvoiceSchema.pre('save', async function () {
-  // If it's not a new document, just exit the function
   if (!this.isNew) return; 
 
   try {
-    // 1. Look for the last invoice saved
-    // Use the model name directly as a string to avoid circular dependency issues
     const lastInvoice = await mongoose.model('Invoice').findOne().sort({ invoiceNumber: -1 });
-    
-    // 2. Increment the number
     this.invoiceNumber = lastInvoice ? lastInvoice.invoiceNumber + 1 : 1;
-    
-    // In async hooks, you don't need to call next()
   } catch (error) {
-    // If there is an error, throwing it will stop the save process
     throw error;
   }
 });
