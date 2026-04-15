@@ -1,13 +1,13 @@
 import mongoose from 'mongoose';
 
-// 1. Define what a "Marker" (the 3.3, 2.2 text on the image) looks like
+// 1. Define what a "Marker" looks like
 const MarkerSchema = new mongoose.Schema({
   x: Number,
   y: Number,
   text: String
 });
 
-// 2. Define what a "Design Layer" (the image + its markers) looks like
+// 2. Define what a "Design Layer" looks like
 const DesignLayerSchema = new mongoose.Schema({
   name: String,
   url: String,
@@ -28,6 +28,13 @@ const InvoiceSchema = new mongoose.Schema({
   bookingDate: { type: Date, default: Date.now },
   deliveryDate: { type: Date },
   
+  // WORK STATUS: This is the manual "Ready" switch
+  status: { 
+    type: String, 
+    enum: ["Pending", "Completed"], 
+    default: "Pending" 
+  },
+  
   measurements: [{
     label: String,
     value: String
@@ -46,36 +53,39 @@ const InvoiceSchema = new mongoose.Schema({
   
   createdAt: { type: Date, default: Date.now }
 }, {
-  // --- UNIQUE FEATURE CONFIG: Makes smartStatus visible to Frontend ---
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// --- UNIQUE FEATURE: DYNAMIC STATUS TRACKING ---
-// Calculates status in real-time based on your FYP Proposal Section 4
+// --- VIRTUAL 1: WORK READINESS (smartStatus) ---
+// Returns "Ready" if Completed, otherwise calculates time-based status
 InvoiceSchema.virtual('smartStatus').get(function() {
-  if (this.balanceAmount <= 0) return "Completed";
+  if (this.status === "Completed") return "Ready";
+  
   if (!this.deliveryDate) return "Pending";
   
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
   const delivery = new Date(this.deliveryDate);
   delivery.setHours(0, 0, 0, 0);
 
-  const diffTime = delivery - today;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.ceil((delivery - today) / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0) return "Overdue";      // Delivery date passed
-  if (diffDays <= 2) return "Urgent";       // Today or Tomorrow
-  return "Upcoming";                        // Normal future orders
+  if (diffDays < 0) return "Overdue";
+  if (diffDays <= 2) return "Urgent";
+  return "Upcoming";
+});
+
+// --- VIRTUAL 2: AUTOMATIC PAYMENT STATUS ---
+// Calculates automatically: 0 balance = Paid, otherwise Unpaid
+InvoiceSchema.virtual('paymentStatus').get(function() {
+  // If balance is 0 or less, it's Paid. Otherwise, it's Unpaid.
+  return this.balanceAmount <= 0 ? "Paid" : "Unpaid";
 });
 
 // --- AUTO-COUNTER LOGIC ---
-// Fixed the "next is not a function" by following async/await pattern properly
 InvoiceSchema.pre('save', async function () {
   if (!this.isNew) return; 
-
   try {
     const lastInvoice = await mongoose.model('Invoice').findOne().sort({ invoiceNumber: -1 });
     this.invoiceNumber = lastInvoice ? lastInvoice.invoiceNumber + 1 : 1;
